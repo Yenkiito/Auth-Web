@@ -23,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::define('manage-admins', fn ($user) => $user->role === Role::OWNER);
+        Vite::createAssetPathsUsing(fn (string $path): string => '/'.ltrim($path, '/'));
         Vite::prefetch(concurrency: 3);
     }
 }
