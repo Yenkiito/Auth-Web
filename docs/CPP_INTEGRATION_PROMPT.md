@@ -2,6 +2,26 @@
 
 Este documento sirve como especificación técnica y como prompt para implementar el cliente de autenticación en un proyecto C++ con Dear ImGui, Win32, DirectX 11, libcurl y nlohmann/json.
 
+## Estado actual de producción
+
+- Panel web: `https://auth-web-rbs9.onrender.com`
+- API C++: `https://auth-web-rbs9.onrender.com/api/v1/`
+- Health check: `https://auth-web-rbs9.onrender.com/up`
+- Base de datos: PostgreSQL administrado por Supabase.
+- Backend: Laravel desplegado mediante Docker en Render.
+- El cliente C++ nunca debe conectarse directamente a Supabase.
+
+Los errores CORS del navegador no aplican a un ejecutable C++ nativo que usa libcurl. Aun así, todas las llamadas deben enviarse exclusivamente por HTTPS a la API indicada.
+
+## Cómo usar este documento
+
+1. Copia este archivo dentro de la raíz del proyecto C++.
+2. Abre el proyecto en Visual Studio con su solución y configuración `x64`.
+3. Entrega al asistente de código la sección **Prompt listo para usar**.
+4. Permite que inspeccione la ubicación real de libcurl, nlohmann/json, `skCrypt` y `menu.h` antes de editar.
+5. No copies `.env`, `APP_KEY`, la contraseña de Supabase ni credenciales administrativas al proyecto C++.
+6. Compila primero en `Debug x64` y después en `Release x64`.
+
 ## Prompt listo para usar
 
 ```text
@@ -15,6 +35,8 @@ Contexto del proyecto C++:
 - El proyecto ya integra libcurl y nlohmann/json.
 - No reemplaces ni reestructures el renderizado existente de ImGui.
 - Reutiliza las dependencias existentes y no agregues otra implementación HTTP o JSON.
+- Inspecciona primero los archivos .sln, .vcxproj, menu.h y el punto de entrada Win32 antes de modificar código.
+- Integra los nuevos .h/.cpp en el proyecto de Visual Studio para que realmente se compilen.
 
 Backend:
 - URL base: https://auth-web-rbs9.onrender.com/api/v1/
@@ -24,9 +46,10 @@ Backend:
   Authorization: Bearer <session_token>
 - Credenciales iniciales de la aplicación:
   name: CNSI
-  ownerid: W3CzqUZwRJ
+  ownerid: VuhTnKxFiy
   version: 1.0
 - Confirma estos tres valores con los mostrados en el panel antes de compilar.
+- No uses https://auth-web.onrender.com: ese no es el dominio de producción asignado.
 
 Crea, como mínimo:
 - KenyraAuthClient.h
@@ -47,6 +70,7 @@ KenyraAuthClient debe:
 - Usar timeouts razonables. La primera solicitud puede tardar por el arranque del plan gratuito de Render.
 - Ejecutar solicitudes en un worker o std::async para no congelar el bucle de Dear ImGui.
 - Impedir dos solicitudes simultáneas desde los botones.
+- Reintentar Init una sola vez ante un timeout de arranque, con una espera corta, pero no reintentar automáticamente errores HTTP 401, 403, 422, 426 o 429.
 
 HWID:
 - Genera un identificador estable de Windows usando MachineGuid y, si no está disponible, un fallback estable del equipo.
@@ -69,11 +93,13 @@ Interfaz Dear ImGui:
 Conserva el estilo del código existente, configura correctamente el proyecto x64 y entrega una lista de archivos modificados. Compila el proyecto y corrige todos los errores antes de finalizar.
 ```
 
+No reemplaces los valores de ejemplo de usuario, contraseña o licencia por secretos reales dentro del código fuente. Esos datos deben introducirse desde la interfaz durante la ejecución.
+
 ## Configuración
 
 ```cpp
 std::string name = skCrypt("CNSI").decrypt();
-std::string ownerid = skCrypt("W3CzqUZwRJ").decrypt();
+std::string ownerid = skCrypt("VuhTnKxFiy").decrypt();
 std::string version = skCrypt("1.0").decrypt();
 std::string url = skCrypt("https://auth-web-rbs9.onrender.com/api/v1/").decrypt();
 std::string path = skCrypt("").decrypt();
@@ -92,7 +118,7 @@ Todas las rutas usan `POST`, `Content-Type: application/json` y `Accept: applica
 ```json
 {
   "name": "CNSI",
-  "ownerid": "W3CzqUZwRJ",
+  "ownerid": "VuhTnKxFiy",
   "version": "1.0"
 }
 ```
@@ -335,4 +361,3 @@ La implementación queda terminada cuando:
 5. Contraseña, versión, licencia o HWID incorrectos muestran el mensaje del servidor.
 6. El cliente deja de habilitar las funciones protegidas si `Check` falla.
 7. El proyecto compila en Visual Studio para x64 sin advertencias nuevas relevantes.
-
