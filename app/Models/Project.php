@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -11,9 +12,14 @@ class Project extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'key_prefix', 'description', 'project_key', 'owner_id', 'version', 'status'];
+    protected $fillable = ['manager_id', 'name', 'slug', 'key_prefix', 'description', 'project_key', 'owner_id', 'version', 'status'];
 
     protected $hidden = ['project_key'];
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
 
     public function partners(): HasMany
     {

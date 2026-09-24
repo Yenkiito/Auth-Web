@@ -3,6 +3,7 @@ import DataTable from "@/Components/DataTable";
 import Modal from "@/Components/Modal";
 import { Field, Select } from "@/Components/FormField";
 import { Head, useForm, usePage } from "@inertiajs/react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageProps } from "@/types";
 type Partner = {
@@ -14,6 +15,8 @@ type Partner = {
     children_count: number;
     clients_count: number;
     licenses_count: number;
+    can_delete: boolean;
+    delete_block_reason?: string;
     account: { username: string; email?: string };
     project: { name: string };
 };
@@ -24,6 +27,7 @@ export default function Index({
 }) {
     const role = usePage<PageProps>().props.auth.user.role;
     const [open, setOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<Partner | null>(null);
     const { data, setData, post, processing, errors } = useForm({
         parent_id: "",
         name: "",
@@ -38,6 +42,23 @@ export default function Index({
         post(
             route(`${role === "PARTNER" ? "partner" : "admin"}.partners.store`),
             { onSuccess: () => setOpen(false) },
+        );
+    };
+    const {
+        delete: destroy,
+        processing: deleting,
+    } = useForm({});
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        destroy(
+            route(
+                `${role === "PARTNER" ? "partner" : "admin"}.partners.destroy`,
+                deleteTarget.id,
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: () => setDeleteTarget(null),
+            },
         );
     };
     return (
@@ -76,6 +97,27 @@ export default function Index({
                     { label: "Descendientes", render: (p) => p.children_count },
                     { label: "Clientes", render: (p) => p.clients_count },
                     { label: "Licencias", render: (p) => p.licenses_count },
+                    {
+                        label: "Acciones",
+                        render: (p) =>
+                            p.can_delete ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setDeleteTarget(p)}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10"
+                                >
+                                    <Trash2 size={15} />
+                                    Eliminar
+                                </button>
+                            ) : p.delete_block_reason ? (
+                                <span
+                                    className="text-xs text-slate-500"
+                                    title={p.delete_block_reason}
+                                >
+                                    Tiene datos asociados
+                                </span>
+                            ) : null,
+                    },
                 ]}
             />
             <Modal
@@ -148,6 +190,36 @@ export default function Index({
                         Crear socio
                     </button>
                 </form>
+            </Modal>
+            <Modal
+                open={deleteTarget !== null}
+                onClose={() => !deleting && setDeleteTarget(null)}
+                title="Eliminar socio"
+                closeable={!deleting}
+            >
+                <p className="text-sm text-slate-300">
+                    ¿Seguro que deseas eliminar a{" "}
+                    <strong>{deleteTarget?.name}</strong>? Su cuenta quedará
+                    bloqueada y sus sesiones se cerrarán.
+                </p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={() => setDeleteTarget(null)}
+                        className="btn-secondary"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={confirmDelete}
+                        className="rounded-xl bg-red-500 px-4 py-2 font-semibold text-white hover:bg-red-400 disabled:opacity-50"
+                    >
+                        {deleting ? "Eliminando..." : "Eliminar socio"}
+                    </button>
+                </div>
             </Modal>
         </AppShell>
     );

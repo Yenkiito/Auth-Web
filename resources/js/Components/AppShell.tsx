@@ -11,6 +11,7 @@ import {
     Settings,
     Users,
     UserRound,
+    UserCog,
 } from "lucide-react";
 import { PropsWithChildren, useState } from "react";
 
@@ -18,6 +19,7 @@ const menus = {
     admin: [
         ["Dashboard", "dashboard", Gauge],
         ["Manage Apps", "projects", FolderKanban],
+        ["Managers", "managers", UserCog],
         ["Partners", "partners", Users],
         ["Users", "users", UserRound],
         ["Licenses", "licenses", KeyRound],
@@ -101,7 +103,9 @@ export default function AppShell({
                     </div>
                 )}
                 <nav className="space-y-1">
-                    {menus[area].map(([label, path, Icon]) => {
+                    {menus[area]
+                        .filter(([, path]) => path !== "managers" || auth.user.role === "OWNER")
+                        .map(([label, path, Icon]) => {
                         const href = route(
                             `${area}.${path}${path === "dashboard" || path === "settings" ? "" : ".index"}`,
                         );
@@ -122,7 +126,7 @@ export default function AppShell({
                         {auth.user.name}
                     </div>
                     <div className="mb-3 text-xs text-slate-500">
-                        {auth.user.role} · @{auth.user.username}
+                        {auth.user.role === "ADMIN" ? "MANAGER" : auth.user.role} · @{auth.user.username}
                     </div>
                     <Link
                         method="post"
@@ -151,6 +155,11 @@ export default function AppShell({
                     {flash.success && (
                         <div className="mb-5 rounded-xl border border-emerald-700/50 bg-emerald-500/10 p-3 text-sm text-emerald-300">
                             {flash.success}
+                        </div>
+                    )}
+                    {flash.error && (
+                        <div className="mb-5 rounded-xl border border-red-700/50 bg-red-500/10 p-3 text-sm text-red-300">
+                            {flash.error}
                         </div>
                     )}
                     {flash.project_key && (

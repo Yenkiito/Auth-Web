@@ -29,7 +29,19 @@ class PartnerController extends Controller
             $query->whereIn('id', $hierarchy->descendantIds($actor->partner));
         }
 
-        return Inertia::render('Partners/Index', ['items' => $query->orderBy('parent_id')->paginate(50), 'projects' => []]);
+        $items = $query->orderBy('parent_id')->paginate(50);
+        $items->through(function (Partner $partner) use ($request) {
+            $canDelete = $request->user()->can('delete', $partner);
+            $hasDependencies = $partner->children_count > 0 || $partner->clients_count > 0 || $partner->licenses_count > 0;
+            $partner->setAttribute('can_delete', $canDelete && ! $hasDependencies);
+            $partner->setAttribute('delete_block_reason', $canDelete && $hasDependencies
+                ? 'Elimina o reasigna primero sus subsocios, clientes y licencias.'
+                : null);
+
+            return $partner;
+        });
+
+        return Inertia::render('Partners/Index', ['items' => $items, 'projects' => []]);
     }
 
     public function store(StorePartnerRequest $request, ActiveProjectService $activeProjects, ActivityLogger $log): RedirectResponse
@@ -67,5 +79,34 @@ class PartnerController extends Controller
         $log->log('partner.updated', ['partner_id' => $partner->id], projectId: $partner->project_id, partnerId: $partner->id);
 
         return back()->with('success', 'Socio actualizado.');
+    }
+
+    public function destroy(Request $request, Partner $partner, ActiveProjectService $activeProjects, ActivityLogger $log): RedirectResponse
+    {
+        $this->authorize('delete', $partner);
+
+        if ($request->user()->isAdmin()) {
+            abort_unless($activeProjects->get($request, $request->user())?->id === $partner->project_id, 403);
+        }
+
+        $partner->loadCount(['children', 'clients', 'licenses']);
+        if ($partner->children_count > 0 || $partner->clients_count > 0 || $partner->licenses_count > 0) {
+            return back()->with('error', 'No se puede eliminar: reasigna o elimina primero sus subsocios, clientes y licencias.');
+        }
+
+        $account = $partner->account;
+        $partnerId = $partner->id;
+        $partnerName = $partner->name;
+        $projectId = $partner->project_id;
+
+        DB::transaction(function () use ($partner, $account) {
+            DB::table('sessions')->where('user_id', $account->id)->delete();
+            $account->forceFill(['status' => 'blocked', 'remember_token' => null])->save();
+            $partner->delete();
+        });
+
+        $log->log('partner.deleted', ['partner_id' => $partnerId, 'partner_name' => $partnerName], projectId: $projectId);
+
+        return back()->with('success', 'Socio eliminado y cuenta desactivada.');
     }
 }

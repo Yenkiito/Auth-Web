@@ -31,6 +31,16 @@ class PartnerPolicy
 
     public function delete(User $user, Partner $partner): bool
     {
-        return $this->update($user, $partner);
+        if ($user->isOwner()) {
+            return true;
+        }
+
+        if ($user->isManager()) {
+            return $this->update($user, $partner);
+        }
+
+        return $user->role === Role::PARTNER
+            && $user->partner_id !== $partner->id
+            && $this->update($user, $partner);
     }
 }

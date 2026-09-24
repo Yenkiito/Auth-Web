@@ -27,7 +27,7 @@ export type PageProps<
     auth: {
         user: User;
     };
-    flash: { success?: string; project_key?: string };
+    flash: { success?: string; error?: string; project_key?: string };
     applicationContext: {
         active?: ActiveProject;
         projects: ProjectSummary[];

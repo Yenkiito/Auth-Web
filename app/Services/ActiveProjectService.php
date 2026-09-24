@@ -14,10 +14,11 @@ class ActiveProjectService
             return $user->project;
         }
 
+        $query = Project::query()->when($user->isManager(), fn ($projects) => $projects->where('manager_id', $user->id));
         $id = $request->session()->get('active_project_id');
-        $project = $id ? Project::find($id) : null;
+        $project = $id ? (clone $query)->find($id) : null;
         if (! $project) {
-            $project = Project::orderBy('name')->first();
+            $project = $query->orderBy('name')->first();
             if ($project) {
                 $request->session()->put('active_project_id', $project->id);
             }

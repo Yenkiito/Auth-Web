@@ -30,6 +30,8 @@ class UserPolicy
 
     public function delete(User $user, User $subject): bool
     {
-        return $user->isAdmin() && $user->id !== $subject->id;
+        return $user->id !== $subject->id
+            && $subject->role === Role::CLIENT
+            && $this->view($user, $subject);
     }
 }

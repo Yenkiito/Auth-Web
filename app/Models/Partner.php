@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,7 +37,7 @@ class Partner extends Model
 
     public function clients(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(User::class)->where('role', Role::CLIENT);
     }
 
     public function licenses(): HasMany

@@ -31,11 +31,11 @@ class ProjectPolicy
 
     public function update(User $user, Project $project): bool
     {
-        return $user->role === Role::ADMIN;
+        return app(ProjectAccessService::class)->project($user, $project);
     }
 
     public function delete(User $user, Project $project): bool
     {
-        return false;
+        return app(ProjectAccessService::class)->project($user, $project);
     }
 }

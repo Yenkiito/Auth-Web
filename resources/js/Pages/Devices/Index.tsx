@@ -13,9 +13,12 @@ export default function Index({items,licenses}:{items:{data:Device[]};licenses:L
     const role=usePage<PageProps>().props.auth.user.role;
     const area=role==='PARTNER'?'partner':'admin';
     const [open,setOpen]=useState(false);
+    const [resetTarget,setResetTarget]=useState<Device|null>(null);
     const {data,setData,post,processing,errors}=useForm({license_id:'',user_id:'',hwid:'',device_name:'',status:'active'});
     const chooseLicense=(id:string)=>{const license=licenses.find(item=>String(item.id)===id);setData({...data,license_id:id,user_id:license?String(license.user_id):''})};
     const submit=(event:React.FormEvent)=>{event.preventDefault();post(route(`${area}.devices.store`),{onSuccess:()=>setOpen(false)})};
+    const resetForm=useForm({});
+    const resetDevice=()=>{if(!resetTarget)return;resetForm.delete(route(`${area}.devices.destroy`,resetTarget.id),{preserveScroll:true,onSuccess:()=>setResetTarget(null)})};
 
     return <AppShell title="Dispositivos"><Head title="Dispositivos"/>
         {role!=='CLIENT'&&<div className="mb-5 flex justify-end"><button className="btn-primary" onClick={()=>setOpen(true)}>Registrar dispositivo</button></div>}
@@ -23,7 +26,7 @@ export default function Index({items,licenses}:{items:{data:Device[]};licenses:L
             {label:'Dispositivo',render:d=><div><b>{d.device_name??'Sin nombre'}</b><code className="block text-xs text-cyan-300">{d.hwid}</code></div>},
             {label:'Cliente',render:d=>d.user.username},{label:'Licencia',render:d=><code>{d.license.key}</code>},{label:'Proyecto',render:d=>d.project.name},
             {label:'Estado',render:d=><span className="badge">{d.status}</span>},{label:'Última conexión',render:d=>d.last_seen_at?new Date(d.last_seen_at).toLocaleString():'—'},
-            {label:'Acciones',render:d=>role==='CLIENT'?'—':<div className="flex gap-2"><button className="text-amber-300" onClick={()=>router.put(route(`${area}.devices.update`,d.id),{status:d.status==='blocked'?'active':'blocked'})}>{d.status==='blocked'?'Desbloquear':'Bloquear'}</button><button className="text-red-300" onClick={()=>confirm('¿Resetear dispositivo?')&&router.delete(route(`${area}.devices.destroy`,d.id))}>Reset</button></div>},
+            {label:'Acciones',render:d=>role==='CLIENT'?'—':<div className="flex gap-2"><button className="text-amber-300" onClick={()=>router.put(route(`${area}.devices.update`,d.id),{status:d.status==='blocked'?'active':'blocked'})}>{d.status==='blocked'?'Desbloquear':'Bloquear'}</button><button className="text-red-300" onClick={()=>setResetTarget(d)}>Reset</button></div>},
         ]}/>
         <Modal open={open} onClose={()=>setOpen(false)} title="Registrar dispositivo"><form onSubmit={submit} className="space-y-4">
             <Select label="Licencia asignada" value={data.license_id} onChange={e=>chooseLicense(e.target.value)} required><option value="">Seleccionar</option>{licenses.map(l=><option key={l.id} value={l.id}>{l.key} · {l.user?.username}</option>)}</Select>
@@ -31,5 +34,9 @@ export default function Index({items,licenses}:{items:{data:Device[]};licenses:L
             <Select label="Estado" value={data.status} onChange={e=>setData('status',e.target.value)}><option value="active">Activo</option><option value="blocked">Bloqueado</option></Select>
             <p className="text-sm text-red-400">{Object.values(errors)[0]}</p><button className="btn-primary w-full" disabled={processing}>Registrar</button>
         </form></Modal>
+        <Modal open={resetTarget!==null} onClose={()=>!resetForm.processing&&setResetTarget(null)} title="Resetear dispositivo" closeable={!resetForm.processing}>
+            <p className="text-sm text-slate-300">¿Eliminar el vínculo del dispositivo <strong>{resetTarget?.device_name??'Sin nombre'}</strong>?</p>
+            <div className="mt-6 flex justify-end gap-3"><button className="btn-secondary" disabled={resetForm.processing} onClick={()=>setResetTarget(null)}>Cancelar</button><button className="rounded-xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50" disabled={resetForm.processing} onClick={resetDevice}>{resetForm.processing?'Eliminando...':'Resetear'}</button></div>
+        </Modal>
     </AppShell>;
 }

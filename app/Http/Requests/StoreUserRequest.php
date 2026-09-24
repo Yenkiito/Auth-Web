@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 class StoreUserRequest extends FormRequest
 {
@@ -19,7 +18,7 @@ class StoreUserRequest extends FormRequest
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'partner_id' => ['nullable', 'integer', 'exists:partners,id'],
             'username' => ['required', 'alpha_dash', 'max:80', 'unique:users,username'],
-            'password' => ['required', Password::defaults()],
+            'password' => ['required', 'string', 'min:1', 'max:255'],
             'expiration' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'hwid_affected' => ['sometimes', 'boolean'],
         ];

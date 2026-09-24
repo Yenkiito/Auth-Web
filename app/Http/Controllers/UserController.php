@@ -13,6 +13,7 @@ use App\Services\PartnerHierarchyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -68,5 +69,47 @@ class UserController extends Controller
         $log->log('user.updated', ['subject_id' => $user->id], projectId: $user->project_id, partnerId: $user->partner_id);
 
         return back()->with('success', 'Usuario actualizado.');
+    }
+
+    public function destroy(Request $request, User $user, ActivityLogger $log): RedirectResponse
+    {
+        $this->authorize('delete', $user);
+        abort_unless($user->role === Role::CLIENT, 403);
+        $projectId = $user->project_id;
+        $partnerId = $user->partner_id;
+        $userId = $user->id;
+        $username = $user->username;
+
+        $log->log('user.deleted', ['subject_id' => $userId, 'username' => $username], projectId: $projectId, partnerId: $partnerId);
+        DB::transaction(function () use ($user) {
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+            $user->delete();
+        });
+
+        return back()->with('success', 'Usuario eliminado.');
+    }
+
+    public function destroyBulk(Request $request, ActivityLogger $log): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+        $users = User::clients()->whereIn('id', $data['ids'])->get();
+        abort_unless($users->count() === count($data['ids']), 404);
+
+        foreach ($users as $user) {
+            $this->authorize('delete', $user);
+        }
+
+        DB::transaction(function () use ($users) {
+            $ids = $users->modelKeys();
+            DB::table('sessions')->whereIn('user_id', $ids)->delete();
+            User::whereIn('id', $ids)->delete();
+        });
+
+        $log->log('user.bulk_deleted', ['quantity' => $users->count()]);
+
+        return back()->with('success', $users->count().' usuarios eliminados.');
     }
 }

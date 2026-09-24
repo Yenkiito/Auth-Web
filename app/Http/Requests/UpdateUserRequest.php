@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -17,6 +16,6 @@ class UpdateUserRequest extends FormRequest
     {
         $u = $this->route('user');
 
-        return ['partner_id' => ['nullable', 'integer', 'exists:partners,id'], 'name' => ['required', 'string', 'max:120'], 'username' => ['required', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($u)], 'email' => ['nullable', 'email', Rule::unique('users')->ignore($u)], 'password' => ['nullable', 'confirmed', Password::defaults()], 'status' => ['required', Rule::in(['active', 'blocked'])]];
+        return ['partner_id' => ['nullable', 'integer', 'exists:partners,id'], 'name' => ['required', 'string', 'max:120'], 'username' => ['required', 'alpha_dash', 'max:80', Rule::unique('users')->ignore($u)], 'email' => ['nullable', 'email', Rule::unique('users')->ignore($u)], 'password' => ['nullable', 'string', 'min:1', 'max:255', 'confirmed'], 'status' => ['required', Rule::in(['active', 'blocked'])]];
     }
 }

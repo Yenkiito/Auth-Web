@@ -7,6 +7,7 @@ use App\Http\Requests\BulkGenerateLicenseRequest;
 use App\Http\Requests\GenerateLicenseRequest;
 use App\Http\Requests\UpdateLicenseRequest;
 use App\Jobs\GenerateLicenseBatch;
+use App\Models\ApiSession;
 use App\Models\License;
 use App\Models\Partner;
 use App\Models\User;
@@ -17,6 +18,7 @@ use App\Services\PartnerHierarchyService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -119,5 +121,51 @@ class LicenseController extends Controller
         $log->log('license.'.$data['status'], ['license_id' => $license->id], projectId: $license->project_id, partnerId: $license->partner_id);
 
         return back()->with('success', 'Licencia actualizada.');
+    }
+
+    public function destroy(Request $request, License $license, ActivityLogger $log): RedirectResponse
+    {
+        $this->authorize('delete', $license);
+
+        $projectId = $license->project_id;
+        $partnerId = $license->partner_id;
+        $licenseId = $license->id;
+
+        DB::transaction(function () use ($license) {
+            ApiSession::where('license_id', $license->id)->delete();
+            $license->devices()->delete();
+            $license->update(['status' => 'revoked']);
+            $license->delete();
+        });
+
+        $log->log('license.deleted', ['subject_id' => $licenseId], projectId: $projectId, partnerId: $partnerId);
+
+        return back()->with('success', 'Licencia eliminada.');
+    }
+
+    public function destroyBulk(Request $request, ActivityLogger $log): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+        $licenses = License::whereIn('id', $data['ids'])->get();
+        abort_unless($licenses->count() === count($data['ids']), 404);
+
+        foreach ($licenses as $license) {
+            $this->authorize('delete', $license);
+        }
+
+        DB::transaction(function () use ($licenses) {
+            $ids = $licenses->modelKeys();
+            ApiSession::whereIn('license_id', $ids)->delete();
+            DB::table('devices')->whereIn('license_id', $ids)->delete();
+            License::whereIn('id', $ids)->update(['status' => 'revoked']);
+            License::whereIn('id', $ids)->delete();
+        });
+
+        $log->log('license.bulk_deleted', ['quantity' => $licenses->count()]);
+
+        return back()->with('success', $licenses->count().' licencias eliminadas.');
     }
 }

@@ -14,6 +14,7 @@ use App\Services\PartnerHierarchyService;
 use App\Services\ProjectKeyGeneratorService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -103,6 +104,115 @@ class KenyraLicenseTest extends TestCase
         $child = Partner::where('name', 'Child')->firstOrFail();
         $this->assertSame($parent->id, $child->parent_id);
         $this->assertSame($project->id, $child->project_id);
+    }
+
+    public function test_owner_can_delete_an_empty_partner_and_disable_its_account(): void
+    {
+        $owner = $this->user(Role::OWNER);
+        $project = $this->project();
+        $partner = $this->partner($project);
+        $account = $partner->account;
+
+        $this->actingAs($owner)
+            ->delete(route('admin.partners.destroy', $partner))
+            ->assertSessionHas('success');
+
+        $this->assertSoftDeleted('partners', ['id' => $partner->id]);
+        $this->assertSame('blocked', $account->fresh()->status);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'partner.deleted']);
+    }
+
+    public function test_partner_with_associated_data_cannot_be_deleted(): void
+    {
+        $owner = $this->user(Role::OWNER);
+        $project = $this->project();
+        $partner = $this->partner($project);
+        $this->user(Role::CLIENT, ['project_id' => $project->id, 'partner_id' => $partner->id]);
+
+        $this->actingAs($owner)
+            ->delete(route('admin.partners.destroy', $partner))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('partners', ['id' => $partner->id, 'deleted_at' => null]);
+        $this->assertSame('active', $partner->account->fresh()->status);
+    }
+
+    public function test_partner_cannot_delete_itself(): void
+    {
+        $project = $this->project();
+        $partner = $this->partner($project);
+
+        $this->actingAs($partner->account)
+            ->delete(route('partner.partners.destroy', $partner))
+            ->assertForbidden();
+    }
+
+    public function test_owner_can_create_a_manager_with_one_character_password(): void
+    {
+        $owner = $this->user(Role::OWNER);
+
+        $this->actingAs($owner)->post(route('admin.managers.store'), [
+            'name' => 'Manager One',
+            'username' => 'manager-one',
+            'email' => 'manager@example.test',
+            'password' => '1',
+            'password_confirmation' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $manager = User::where('username', 'manager-one')->firstOrFail();
+        $this->assertSame(Role::ADMIN, $manager->role);
+        $this->assertTrue(Hash::check('1', $manager->password));
+    }
+
+    public function test_manager_owns_created_applications_and_cannot_access_another_manager_application(): void
+    {
+        $managerA = $this->user(Role::ADMIN);
+        $managerB = $this->user(Role::ADMIN);
+        $otherProject = $this->project('other-manager-app');
+        $otherProject->update(['manager_id' => $managerB->id]);
+
+        $this->actingAs($managerA)->post(route('admin.projects.store'), [
+            'name' => 'Manager A App',
+            'key_prefix' => 'MGRA',
+            'version' => '1.0',
+            'status' => 'active',
+        ])->assertSessionHasNoErrors();
+
+        $created = Project::where('name', 'Manager A App')->firstOrFail();
+        $this->assertSame($managerA->id, $created->manager_id);
+        $this->actingAs($managerA)->post(route('admin.projects.select', $otherProject))->assertForbidden();
+    }
+
+    public function test_manager_can_delete_own_application_and_associated_accounts_are_blocked(): void
+    {
+        $manager = $this->user(Role::ADMIN);
+        $project = $this->project('manager-delete');
+        $project->update(['manager_id' => $manager->id]);
+        $client = $this->user(Role::CLIENT, ['project_id' => $project->id, 'status' => 'active']);
+
+        $this->actingAs($manager)
+            ->delete(route('admin.projects.destroy', $project))
+            ->assertRedirect(route('admin.projects.index'));
+
+        $this->assertSoftDeleted('projects', ['id' => $project->id]);
+        $this->assertSame('blocked', $client->fresh()->status);
+    }
+
+    public function test_client_password_can_have_one_character(): void
+    {
+        $owner = $this->user(Role::OWNER);
+        $project = $this->project('short-password');
+
+        $this->actingAs($owner)->post(route('admin.users.store'), [
+            'username' => 'short-pass-client',
+            'password' => '1',
+            'expiration' => now()->addDay()->format('Y-m-d'),
+            'hwid_affected' => false,
+        ])->assertSessionHasNoErrors();
+
+        $client = User::where('username', 'short-pass-client')->firstOrFail();
+        $this->assertSame($project->id, $client->project_id);
+        $this->assertTrue(Hash::check('1', $client->password));
     }
 
     public function test_license_generator_creates_secure_unique_serials_in_bulk(): void

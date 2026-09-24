@@ -84,6 +84,21 @@ class User extends Authenticatable
         return $this->hasMany(Device::class);
     }
 
+    public function managedProjects(): HasMany
+    {
+        return $this->hasMany(Project::class, 'manager_id');
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === Role::OWNER;
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role === Role::ADMIN;
+    }
+
     public function scopeClients(Builder $query): Builder
     {
         return $query->where('role', Role::CLIENT);

@@ -2,13 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Role;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Models\ApiSession;
+use App\Models\Device;
+use App\Models\License;
+use App\Models\Partner;
 use App\Models\Project;
+use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\ProjectKeyGeneratorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,7 +25,9 @@ class ProjectController extends Controller
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Project::class);
-        $projects = Project::withCount(['partners', 'users', 'licenses'])->orderBy('name')->get();
+        $projects = Project::query()
+            ->when($request->user()->isManager(), fn ($query) => $query->where('manager_id', $request->user()->id))
+            ->withCount(['partners', 'users', 'licenses'])->orderBy('name')->get();
         $selected = $projects->firstWhere('id', (int) $request->session()->get('active_project_id')) ?? $projects->first();
         if ($selected) {
             $request->session()->put('active_project_id', $selected->id);
@@ -43,6 +52,7 @@ class ProjectController extends Controller
             $slug = $baseSlug.'-'.$suffix;
         }
         $project = Project::create([
+            'manager_id' => $request->user()->role === Role::ADMIN ? $request->user()->id : null,
             'name' => $data['name'], 'slug' => $slug, 'key_prefix' => $data['key_prefix'], 'description' => $data['description'] ?? null,
             'version' => $data['version'] ?? '1.0', 'status' => $data['status'] ?? 'active',
             'owner_id' => $keys->ownerId(), 'project_key' => $keys->generate(),
@@ -92,5 +102,33 @@ class ProjectController extends Controller
         $this->authorize('view', $project);
 
         return back()->with('project_key', $project->project_key);
+    }
+
+    public function destroy(Request $request, Project $project, ActivityLogger $log): RedirectResponse
+    {
+        $this->authorize('delete', $project);
+        $projectId = $project->id;
+        $projectName = $project->name;
+
+        DB::transaction(function () use ($project) {
+            $userIds = User::where('project_id', $project->id)->pluck('id');
+            DB::table('sessions')->whereIn('user_id', $userIds)->delete();
+            ApiSession::where('project_id', $project->id)->delete();
+            Device::where('project_id', $project->id)->delete();
+            License::where('project_id', $project->id)->delete();
+            Partner::where('project_id', $project->id)->delete();
+            User::where('project_id', $project->id)->update([
+                'status' => 'blocked',
+                'remember_token' => null,
+            ]);
+            $project->delete();
+        });
+
+        if ((int) $request->session()->get('active_project_id') === $projectId) {
+            $request->session()->forget('active_project_id');
+        }
+        $log->log('project.deleted', ['project_id' => $projectId, 'project_name' => $projectName]);
+
+        return redirect()->route('admin.projects.index')->with('success', 'Aplicación eliminada y accesos asociados bloqueados.');
     }
 }

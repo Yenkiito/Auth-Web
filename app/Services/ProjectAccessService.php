@@ -15,13 +15,23 @@ class ProjectAccessService
 
     public function project(User $actor, Project $project): bool
     {
-        return $actor->isAdmin() || $actor->project_id === $project->id;
+        if ($actor->isOwner()) {
+            return true;
+        }
+        if ($actor->isManager()) {
+            return $project->manager_id === $actor->id;
+        }
+
+        return $actor->project_id === $project->id;
     }
 
     public function partner(User $actor, Partner $partner): bool
     {
-        if ($actor->isAdmin()) {
+        if ($actor->isOwner()) {
             return true;
+        }
+        if ($actor->isManager()) {
+            return $this->project($actor, $partner->project);
         }
 
         return $actor->role === Role::PARTNER && $actor->partner && $this->hierarchy->contains($actor->partner, $partner);
@@ -29,8 +39,11 @@ class ProjectAccessService
 
     public function user(User $actor, User $subject): bool
     {
-        if ($actor->isAdmin() || $actor->id === $subject->id) {
+        if ($actor->isOwner() || $actor->id === $subject->id) {
             return true;
+        }
+        if ($actor->isManager()) {
+            return $subject->project && $this->project($actor, $subject->project);
         }
 
         return $actor->role === Role::PARTNER && $subject->project_id === $actor->project_id && $subject->partner_id && in_array($subject->partner_id, $this->hierarchy->descendantIds($actor->partner), true);
@@ -38,8 +51,11 @@ class ProjectAccessService
 
     public function license(User $actor, License $license): bool
     {
-        if ($actor->isAdmin()) {
+        if ($actor->isOwner()) {
             return true;
+        }
+        if ($actor->isManager()) {
+            return $this->project($actor, $license->project);
         }
         if ($actor->role === Role::CLIENT) {
             return $license->user_id === $actor->id;
@@ -50,6 +66,14 @@ class ProjectAccessService
 
     public function device(User $actor, Device $device): bool
     {
-        return $device->project_id === ($actor->project_id ?? $device->project_id) && ($actor->isAdmin() || $device->user_id === $actor->id || $this->license($actor, $device->license));
+        if ($actor->isOwner()) {
+            return true;
+        }
+        if ($actor->isManager()) {
+            return $this->project($actor, $device->project);
+        }
+
+        return $device->project_id === $actor->project_id
+            && ($device->user_id === $actor->id || $this->license($actor, $device->license));
     }
 }

@@ -2,7 +2,7 @@ import { Field } from "@/Components/FormField";
 import AppShell from "@/Components/AppShell";
 import Modal from "@/Components/Modal";
 import { Head, Link, router, useForm } from "@inertiajs/react";
-import { Check, Clipboard, Code2, Pause, Plus, RefreshCw } from "lucide-react";
+import { Check, Clipboard, Code2, Pause, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 type Project = {
@@ -30,6 +30,8 @@ export default function Index({
     const [open, setOpen] = useState(false);
     const [showCode, setShowCode] = useState(false);
     const [copied, setCopied] = useState("");
+    const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+    const [rotateTarget, setRotateTarget] = useState<Project | null>(null);
     const { data, setData, post, processing, errors, reset } = useForm({
         name: "",
         description: "",
@@ -64,6 +66,20 @@ export default function Index({
         ["Paused", items.filter((p) => p.status !== "active").length],
         ["Users", selected?.users_count ?? 0],
     ];
+    const deleteForm = useForm({});
+    const rotateForm = useForm({});
+    const deleteApplication = () => {
+        if (!deleteTarget) return;
+        deleteForm.delete(route("admin.projects.destroy", deleteTarget.id), {
+            onSuccess: () => setDeleteTarget(null),
+        });
+    };
+    const rotateSecret = () => {
+        if (!rotateTarget) return;
+        rotateForm.post(route("admin.projects.rotate", rotateTarget.id), {
+            onSuccess: () => setRotateTarget(null),
+        });
+    };
 
     return (
         <AppShell title="Manage Applications">
@@ -158,17 +174,7 @@ export default function Index({
                             ))}
                             <button
                                 className="btn-secondary w-full text-amber-300"
-                                onClick={() =>
-                                    confirm(
-                                        "¿Regenerar e invalidar el secreto actual?",
-                                    ) &&
-                                    router.post(
-                                        route(
-                                            "admin.projects.rotate",
-                                            selected.id,
-                                        ),
-                                    )
-                                }
+                                onClick={() => setRotateTarget(selected)}
                             >
                                 <RefreshCw size={15} className="mr-2" />
                                 Refresh Application Secret
@@ -210,7 +216,7 @@ export default function Index({
                                         {app.status.toUpperCase()}
                                     </span>
                                 </div>
-                                <div className="mt-4 flex gap-2">
+                                <div className="mt-4 flex flex-wrap gap-2">
                                     {app.id === selected?.id ? (
                                         <span className="btn bg-emerald-700/30 text-emerald-300">
                                             <Check size={15} className="mr-2" />
@@ -244,6 +250,9 @@ export default function Index({
                                         {app.status === "active"
                                             ? "Pause"
                                             : "Activate"}
+                                    </button>
+                                    <button className="inline-flex items-center rounded-xl border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10" onClick={() => setDeleteTarget(app)}>
+                                        <Trash2 size={15} className="mr-2" />Delete
                                     </button>
                                 </div>
                             </div>
@@ -309,6 +318,20 @@ export default function Index({
                         </button>
                     </div>
                 </form>
+            </Modal>
+            <Modal open={deleteTarget !== null} onClose={() => !deleteForm.processing && setDeleteTarget(null)} title="Delete Application" closeable={!deleteForm.processing}>
+                <p className="text-sm text-slate-300">¿Eliminar <strong>{deleteTarget?.name}</strong>? La aplicación dejará de funcionar, sus sesiones API se cerrarán y las cuentas asociadas serán bloqueadas.</p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <button className="btn-secondary" disabled={deleteForm.processing} onClick={() => setDeleteTarget(null)}>Cancel</button>
+                    <button className="rounded-xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50" disabled={deleteForm.processing} onClick={deleteApplication}>{deleteForm.processing ? "Deleting..." : "Delete Application"}</button>
+                </div>
+            </Modal>
+            <Modal open={rotateTarget !== null} onClose={() => !rotateForm.processing && setRotateTarget(null)} title="Refresh Application Secret" closeable={!rotateForm.processing}>
+                <p className="text-sm text-slate-300">¿Regenerar el secreto de <strong>{rotateTarget?.name}</strong>? El secreto anterior quedará invalidado.</p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <button className="btn-secondary" disabled={rotateForm.processing} onClick={() => setRotateTarget(null)}>Cancel</button>
+                    <button className="rounded-xl bg-amber-500 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" disabled={rotateForm.processing} onClick={rotateSecret}>{rotateForm.processing ? "Refreshing..." : "Refresh Secret"}</button>
+                </div>
             </Modal>
         </AppShell>
     );

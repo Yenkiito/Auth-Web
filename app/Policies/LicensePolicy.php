@@ -31,6 +31,6 @@ class LicensePolicy
 
     public function delete(User $user, License $license): bool
     {
-        return false;
+        return $user->role !== Role::CLIENT && $this->view($user, $license);
     }
 }

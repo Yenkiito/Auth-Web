@@ -41,10 +41,15 @@ class HandleInertiaRequests extends Middleware
             ],
             'applicationContext' => [
                 'active' => $activeProject?->only(['id', 'name', 'status']),
-                'projects' => $user?->isAdmin() ? fn () => Project::orderBy('name')->get(['id', 'name', 'status']) : [],
+                'projects' => $user?->isAdmin()
+                    ? fn () => Project::query()
+                        ->when($user->isManager(), fn ($projects) => $projects->where('manager_id', $user->id))
+                        ->orderBy('name')->get(['id', 'name', 'status'])
+                    : [],
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
                 'project_key' => fn () => $request->session()->get('project_key'),
             ],
         ];
