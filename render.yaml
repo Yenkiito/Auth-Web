@@ -19,9 +19,7 @@ services:
       - key: APP_KEY
         sync: false
       - key: APP_URL
-        sync: false
-      - key: ASSET_URL
-        sync: false
+        value: https://auth-web-rbs9.onrender.com
       - key: APP_LOCALE
         value: es
       - key: APP_FALLBACK_LOCALE

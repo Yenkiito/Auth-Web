@@ -12,8 +12,8 @@ El repositorio incluye un `Dockerfile` y un Blueprint `render.yaml`. La Web Serv
 Configura:
 
 - `APP_KEY`: salida de `php artisan key:generate --show`. Puede usarse la clave local actual si ya existen datos cifrados que deban conservarse.
-- `APP_URL`: URL final, por ejemplo `https://auth-web.onrender.com`.
-- `ASSET_URL`: la misma URL de `APP_URL`.
+- `APP_URL`: `https://auth-web-rbs9.onrender.com`.
+- No definas `ASSET_URL`: así Laravel genera los recursos desde el mismo dominio de la petición y evita errores CORS.
 - `DB_PASSWORD`: solamente la contraseña PostgreSQL de Supabase, nunca la URI completa.
 
 El resto de los parámetros PostgreSQL ya corresponde al Session Pooler del proyecto configurado.

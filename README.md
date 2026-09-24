@@ -49,3 +49,5 @@ La API para clientes externos está disponible en `/api/v1`. El flujo es `init`,
 Para utilizar Supabase como PostgreSQL, consulta [docs/SUPABASE.md](docs/SUPABASE.md).
 
 Para publicar Laravel en Render y mantener PostgreSQL en Supabase, consulta [docs/RENDER.md](docs/RENDER.md).
+
+Para conectar un cliente C++ con Dear ImGui, libcurl y nlohmann/json, consulta [docs/CPP_INTEGRATION_PROMPT.md](docs/CPP_INTEGRATION_PROMPT.md).
