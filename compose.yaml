@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-auth_web}
+      POSTGRES_USER: ${DB_USERNAME:-kenyra}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD in .env}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - kenyra_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-kenyra} -d ${DB_DATABASE:-auth_web}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kenyra_postgres_data:
