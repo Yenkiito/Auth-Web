@@ -45,3 +45,7 @@ npm run build
 ```
 
 La API para clientes externos está disponible en `/api/v1`. El flujo es `init`, `login`, `license` y `check`; acepta el token mediante `Authorization: Bearer <token>` o `session_token` en el JSON. Consulta [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para las decisiones de seguridad y aislamiento.
+
+Para utilizar Supabase como PostgreSQL, consulta [docs/SUPABASE.md](docs/SUPABASE.md).
+
+Para publicar Laravel en Render y mantener PostgreSQL en Supabase, consulta [docs/RENDER.md](docs/RENDER.md).
